@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hello!</title>
+  </head>
+  <body style="background-color: #24273a; color: #fff">
+    <h1>Hello!</h1>
+    <form action="" id="form">
+      <input type="text" id="habit" />
+      <button type="submit" id="btn">Add habit</button>
+    </form>
+  </body>
+  <script>
+    let habit = document.getElementById("habit");
+    habit.value = "hello world";
+    let form = document.getElementById("form");
+    console.log(form);
+
+    let data = { value: habit.value };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      console.log(habit.value);
+      try {
+        const response = await fetch("http://127.0.0.1:3000", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+        const result = await response.json();
+        console.log("Success:", result);
+      } catch (e) {
+        console.error("Error:", e);
+      }
+    });
+  </script>
+</html>
