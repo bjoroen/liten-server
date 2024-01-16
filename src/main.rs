@@ -1,6 +1,6 @@
 use std::{
     fs,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::TcpListener,
 };
 
@@ -27,15 +27,13 @@ fn main() {
             let verb = get_verb(&http_request[0]);
 
             match verb {
-                HttpVerb::GET => handle_get(stream),
-                HttpVerb::POST => todo!(),
+                HttpVerb::GET => handle_get(&stream),
+                HttpVerb::POST => handle_post(&stream),
             }
         } else {
             // Log issue
             todo!()
         }
-
-        println!("connection...")
     }
 }
 
@@ -48,8 +46,20 @@ fn get_verb(req_string: &str) -> HttpVerb {
     }
 }
 
-fn handle_get(mut stream: std::net::TcpStream) {
-    let status_line = "HTTP/1.1 200 OK";
+fn handle_post(mut stream: &std::net::TcpStream) {
+    let mut buf = Vec::new();
+    let bytes = stream.read_to_end(&mut buf).unwrap();
+    println!("number of bytes {bytes}");
+    println!("{:#?}", buf);
+
+    let status_line_ok = "HTTP/1.1 200 OK";
+
+    stream.write_all(status_line_ok.as_bytes());
+}
+
+fn handle_get(mut stream: &std::net::TcpStream) {
+    let status_line_ok = "HTTP/1.1 200 OK";
+    let status_line_error = "HTTP/1.1 500 INTERNAL SERVER ERROR";
 
     let html = match fs::read_to_string("./src/index.html") {
         Ok(v) => v,
@@ -58,7 +68,7 @@ fn handle_get(mut stream: std::net::TcpStream) {
 
     let length = html.len();
 
-    let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{html}");
+    let response = format!("{status_line_ok}\r\nContent-Length: {length}\r\n\r\n{html}");
 
     stream
         .write_all(response.as_bytes())
