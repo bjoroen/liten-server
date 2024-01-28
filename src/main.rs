@@ -1,76 +1,24 @@
 use std::{
-    fs,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Read},
     net::TcpListener,
 };
 
-enum HttpVerb {
-    GET,
-    POST,
-}
+use liten_http::Request;
 
 fn main() {
     let listener =
         TcpListener::bind("127.0.0.1:3000").expect("Could not start server on port 3000");
 
     for stream in listener.incoming() {
-        if let Ok(mut stream) = stream {
-            let buf_read = BufReader::new(&mut stream);
-            let http_request: Vec<_> = buf_read
-                .lines()
-                .map(|result| result.unwrap())
-                .take_while(|line| !line.is_empty())
-                .collect();
+        let mut buf_read = BufReader::new(stream.unwrap());
+        let mut request_string = String::new();
+        let _ = buf_read.read_to_string(&mut request_string);
 
-            println!("{:#?}", http_request);
+        let request = Request::from_string(&request_string);
 
-            let verb = get_verb(&http_request[0]);
+        let result = request.unwrap();
 
-            match verb {
-                HttpVerb::GET => handle_get(&stream),
-                HttpVerb::POST => handle_post(&stream),
-            }
-        } else {
-            // Log issue
-            todo!()
-        }
+        println!("{:#?}", result.method);
+        println!("{:#?}", result.header);
     }
-}
-
-fn get_verb(req_string: &str) -> HttpVerb {
-    let verb = req_string.split_once(" ").unwrap();
-    match verb.0 {
-        "GET" => HttpVerb::GET,
-        "POST" => HttpVerb::POST,
-        _ => todo!(),
-    }
-}
-
-fn handle_post(mut stream: &std::net::TcpStream) {
-    let mut buf = Vec::new();
-    let bytes = stream.read_to_end(&mut buf).unwrap();
-    println!("number of bytes {bytes}");
-    println!("{:#?}", buf);
-
-    let status_line_ok = "HTTP/1.1 200 OK";
-
-    stream.write_all(status_line_ok.as_bytes());
-}
-
-fn handle_get(mut stream: &std::net::TcpStream) {
-    let status_line_ok = "HTTP/1.1 200 OK";
-    let status_line_error = "HTTP/1.1 500 INTERNAL SERVER ERROR";
-
-    let html = match fs::read_to_string("./src/index.html") {
-        Ok(v) => v,
-        Err(e) => panic!("could not read file: {e}"),
-    };
-
-    let length = html.len();
-
-    let response = format!("{status_line_ok}\r\nContent-Length: {length}\r\n\r\n{html}");
-
-    stream
-        .write_all(response.as_bytes())
-        .unwrap_or_else(|e| eprintln!("Could not write to stream: {e}"));
 }

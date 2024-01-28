@@ -5,3 +5,10 @@ version = 3
 [[package]]
 name = "dashboard"
 version = "0.1.0"
+dependencies = [
+ "liten-http",
+]
+
+[[package]]
+name = "liten-http"
+version = "0.1.0"
