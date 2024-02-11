@@ -1,0 +1,5 @@
+!#/usr/bin/bash
+
+cargo build
+
+rust-gdb --args target/debug/liten-server

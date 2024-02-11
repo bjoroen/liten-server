@@ -3,12 +3,35 @@
 version = 3
 
 [[package]]
-name = "dashboard"
-version = "0.1.0"
+name = "bitflags"
+version = "2.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed570934406eb16438a4e976b1b4500774099c13b8cb96eec99f620f05090ddf"
+
+[[package]]
+name = "epoll"
+version = "4.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74351c3392ea1ff6cd2628e0042d268ac2371cb613252ff383b6dfa50d22fa79"
 dependencies = [
- "liten-http",
+ "bitflags",
+ "libc",
 ]
+
+[[package]]
+name = "libc"
+version = "0.2.153"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
 
 [[package]]
 name = "liten-http"
 version = "0.1.0"
+
+[[package]]
+name = "liten-server"
+version = "0.1.0"
+dependencies = [
+ "epoll",
+ "liten-http",
+]
