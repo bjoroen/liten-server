@@ -1,5 +1,5 @@
 use std::{
-    arch::asm,
+    collections::HashMap,
     io::{self, Read, Write},
     net::TcpListener,
     os::fd::AsRawFd,
@@ -25,47 +25,53 @@ fn main() {
     let epoll = epoll::create(false).unwrap();
     let listener =
         TcpListener::bind("127.0.0.1:3000").expect("Could not start server on port 3000");
-    listener.set_nonblocking(true).unwrap();
+    // listener.set_nonblocking(true).unwrap();
 
     // Add the listener to epoll
     let event = Event::new(Events::EPOLLIN, listener.as_raw_fd() as _);
     epoll::ctl(epoll, EPOLL_CTL_ADD, listener.as_raw_fd(), event).unwrap();
 
+    let mut connections = HashMap::new();
+
     loop {
         let mut events = [Event::new(Events::empty(), 0); 1024];
-        let timeout = -1;
-        let num_events = epoll::wait(epoll, timeout, &mut events).unwrap();
-
-        for event in &events[..num_events] {}
-    }
-
-    let mut connections = Vec::new();
-
-    loop {
-        match listener.accept() {
-            Ok((connection, _)) => {
-                connection.set_nonblocking(true).unwrap();
-                let state = ConnectionState::Read {
-                    request: [0u8; 1024],
-                    read: 0,
-                };
-                connections.push((connection, state))
-            }
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-            Err(e) => {
-                eprintln!("Error: {e}")
-            }
-        };
-
+        // block until epoll wakes up
+        let num_events = epoll::wait(epoll, 0, &mut events).unwrap();
         let mut completed = Vec::new();
 
-        'next: for (i, (connection, state)) in connections.iter_mut().enumerate() {
+        'next: for event in &events[..num_events] {
+            let fd = event.data as i32;
+
+            if fd == listener.as_raw_fd() {
+                match listener.accept() {
+                    Ok((connection, _)) => {
+                        connection.set_nonblocking(true).unwrap();
+                        let fd = connection.as_raw_fd();
+
+                        let event = Event::new(Events::EPOLLIN | Events::EPOLLOUT, fd as _);
+                        epoll::ctl(epoll, EPOLL_CTL_ADD, fd, event).unwrap();
+
+                        let state = ConnectionState::Read {
+                            request: [0u8; 1024],
+                            read: 0,
+                        };
+                        connections.insert(fd, (connection, state));
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                    Err(e) => panic!("{e}"),
+                }
+
+                continue 'next;
+            }
+
+            let (connection, state) = connections.get_mut(&fd).unwrap();
+
             if let ConnectionState::Read { request, read } = state {
                 loop {
                     match connection.read(&mut request[*read..]) {
                         Ok(0) => {
                             eprintln!("client disconnected...");
-                            completed.push(i);
+                            completed.push(event.data as i32);
                             continue 'next;
                         }
                         Ok(n) => *read += n,
@@ -100,7 +106,7 @@ fn main() {
                     match connection.write(&response[*written..]) {
                         Ok(0) => {
                             eprintln!("client disconnected...");
-                            completed.push(i);
+                            completed.push(event.data as i32);
                             continue 'next;
                         }
                         Ok(n) => *written += n,
@@ -117,15 +123,16 @@ fn main() {
             }
             if let ConnectionState::Flush = state {
                 match connection.flush() {
-                    Ok(_) => completed.push(i),
+                    Ok(_) => completed.push(event.data as i32),
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue 'next,
                     Err(e) => eprintln!("Error: {e}"),
                 }
             }
         }
 
-        for i in completed.into_iter().rev() {
-            connections.remove(i);
+        for fd in completed {
+            let (connection, _state) = connections.remove(&fd).unwrap();
+            drop(connection);
         }
     }
 }
